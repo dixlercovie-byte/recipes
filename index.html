@@ -104,7 +104,7 @@ function scaleLine(text, factor) {
 // ---- views ----
 function render() {
   const app = document.getElementById("app");
-  app.innerHTML = view.name === "edit" ? editView() : view.name === "detail" ? detailView() : listView();
+  app.innerHTML = view.name === "edit" ? editView() : view.name === "calc" ? calcView() : view.name === "detail" ? detailView() : listView();
   window.scrollTo(0, 0);
   if (view.name === "list") bindSearch();
 }
@@ -119,7 +119,7 @@ function listView() {
   const tags = allTags();
   return `
     <header><h1>🍳 Recipes</h1>
-      <div class="row"><button onclick="importFile()">Import</button><button onclick="exportAll()">Export</button>
+      <div class="row"><button onclick="openCalc()">⚖ Convert</button><button onclick="importFile()">Import</button><button onclick="exportAll()">Export</button>
       <button class="primary" onclick="newRecipe()">+ New</button></div></header>
     <input id="search" type="search" placeholder="Search title, tag or ingredient…" value="${esc(filter.q)}">
     <div class="chips">
@@ -192,6 +192,62 @@ function editView() {
     <textarea id="f-steps">${esc(r.steps.join("\n"))}</textarea>
     <label>Notes</label><textarea id="f-notes" style="min-height:4rem">${esc(r.notes)}</textarea>`;
 }
+
+// ---- grams <-> cups / tablespoons / teaspoons ----
+// Approximate grams per US cup (240 ml). Varies with brand, packing and humidity.
+const DENSITIES = [
+  ["All-purpose flour", 125], ["Bread flour", 130], ["Whole wheat flour", 120], ["Almond flour", 96],
+  ["Cornstarch", 128], ["Cocoa powder", 85], ["Rolled oats", 90],
+  ["Granulated sugar", 200], ["Brown sugar (packed)", 213], ["Powdered sugar", 120],
+  ["Butter", 227], ["Vegetable / olive oil", 218], ["Honey / maple syrup", 340],
+  ["Water", 240], ["Milk", 245], ["Heavy cream", 240], ["Peanut butter", 258],
+  ["Uncooked rice", 185], ["Chocolate chips", 170],
+  ["Table salt", 288], ["Baking powder", 230], ["Baking soda", 220],
+  ["Custom (grams per cup)", 0],
+];
+const calc = { last: "grams", ing: 0, custom: 200, grams: "", cups: "", tbsp: "", tsp: "" };
+
+function gPerCup() { return calc.ing === DENSITIES.length - 1 ? +calc.custom || 0 : DENSITIES[calc.ing][1]; }
+function trim(n) { return String(Math.round(n * 100) / 100); }
+function openCalc() { view = { name: "calc" }; render(); }
+
+function calcView() {
+  return `
+    <header><button onclick="goList()">← Back</button><h1>⚖ Converter</h1><span></span></header>
+    <label>Ingredient</label>
+    <select id="c-ing" onchange="calc.ing=+this.value; calcRefresh(); document.getElementById('c-custom-wrap').classList.toggle('hidden', calc.ing !== ${DENSITIES.length - 1})">
+      ${DENSITIES.map((d, i) => `<option value="${i}" ${i === calc.ing ? "selected" : ""}>${esc(d[0])}${d[1] ? " (" + d[1] + " g/cup)" : ""}</option>`).join("")}
+    </select>
+    <div id="c-custom-wrap" class="${calc.ing === DENSITIES.length - 1 ? "" : "hidden"}">
+      <label>Grams per cup</label>
+      <input id="c-custom" type="number" min="1" inputmode="decimal" value="${calc.custom}" oninput="calc.custom=this.value; calcRefresh()">
+    </div>
+    <div class="row">
+      <div><label>Grams</label><input id="c-grams" type="number" min="0" inputmode="decimal" value="${calc.grams}" oninput="calcFrom('grams', this.value)"></div>
+      <div><label>Cups</label><input id="c-cups" type="number" min="0" inputmode="decimal" value="${calc.cups}" oninput="calcFrom('cups', this.value)"></div>
+    </div>
+    <div class="row">
+      <div><label>Tablespoons</label><input id="c-tbsp" type="number" min="0" inputmode="decimal" value="${calc.tbsp}" oninput="calcFrom('tbsp', this.value)"></div>
+      <div><label>Teaspoons</label><input id="c-tsp" type="number" min="0" inputmode="decimal" value="${calc.tsp}" oninput="calcFrom('tsp', this.value)"></div>
+    </div>
+    <p class="meta">1 cup = 16 tbsp = 48 tsp (US). Weights per cup are approximate and vary with brand and how the ingredient is packed — for best results, weigh.</p>`;
+}
+
+// Edit any field; the other three update.
+function calcFrom(field, raw) {
+  calc[field] = raw; calc.last = field;
+  const v = parseFloat(raw);
+  const g = gPerCup();
+  if (!(v >= 0) || (field === "grams" && !g)) { ["grams", "cups", "tbsp", "tsp"].filter((f) => f !== field).forEach((f) => setCalc(f, "")); return; }
+  const cups = field === "cups" ? v : field === "tbsp" ? v / 16 : field === "tsp" ? v / 48 : v / g;
+  if (field !== "grams") setCalc("grams", trim(cups * g));
+  if (field !== "cups") setCalc("cups", trim(cups));
+  if (field !== "tbsp") setCalc("tbsp", trim(cups * 16));
+  if (field !== "tsp") setCalc("tsp", trim(cups * 48));
+}
+// Re-run from the field the user last edited (used when the ingredient changes).
+function calcRefresh() { if (calc[calc.last] !== "") calcFrom(calc.last, calc[calc.last]); }
+function setCalc(f, val) { calc[f] = val; const el = document.getElementById("c-" + f); if (el) el.value = val; }
 
 // ---- actions ----
 const blank = () => ({ id: uid(), title: "", servings: 4, time: "", tags: [], source: "", ingredients: [], steps: [], notes: "", fav: false });
