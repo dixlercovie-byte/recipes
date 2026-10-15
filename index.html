@@ -19,7 +19,9 @@
     background: Canvas; color: CanvasText;
   }
   h1 { font-size: 1.5rem; margin: 0; }
-  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+  header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .toolbar button { padding: 0.4rem 0.6rem; font-size: 0.9rem; white-space: nowrap; }
   button, input, textarea, select {
     font: inherit; color: inherit; background: Field;
     border: 1px solid #8886; border-radius: 8px; padding: 0.5rem 0.7rem;
@@ -119,7 +121,7 @@ function listView() {
   const tags = allTags();
   return `
     <header><h1>🍳 Recipes</h1>
-      <div class="row"><button onclick="openCalc()">⚖ Convert</button><button onclick="importFile()">Import</button><button onclick="exportAll()">Export</button>
+      <div class="toolbar"><button onclick="openCalc()">⚖ Convert</button><button onclick="importFile()">Import</button><button onclick="exportAll()">Export</button>
       <button class="primary" onclick="newRecipe()">+ New</button></div></header>
     <input id="search" type="search" placeholder="Search title, tag or ingredient…" value="${esc(filter.q)}">
     <div class="chips">
@@ -133,7 +135,8 @@ function listView() {
         ${r.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join("")}
       </button>`).join("")
       : `<div class="empty">${recipes.length ? "No recipes match." : "No recipes yet. Tap “+ New” to add your first."}</div>`}
-    <input type="file" id="importInput" accept="application/json" class="hidden">`;
+    <input type="file" id="importInput" accept="application/json" class="hidden">
+    <p class="meta" style="text-align:center;margin-top:2rem"><a href="privacy.html">Privacy policy</a></p>`;
 }
 
 function bindSearch() {

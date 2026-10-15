@@ -16,3 +16,7 @@ Static files, no build step. With GitHub Pages (branch `main`, folder `/`) this 
 The "Add to shopping list" button links to `/shopping-list/index.html`, so it expects the shopping list
 to be served from the same domain under `/shopping-list/` (as it is with GitHub Pages for both repos).
 Change the path in `sendToShoppingList()` in `index.html` if you host it elsewhere.
+
+## Google Play
+
+Store assets, listing text and step-by-step publishing notes are in [`store/`](store/PUBLISHING.md). Privacy policy: [`privacy.html`](privacy.html).
