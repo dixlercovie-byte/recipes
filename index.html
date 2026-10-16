@@ -57,6 +57,11 @@
   .hidden { display: none; }
   .notes { white-space: pre-wrap; background: #8881; padding: 0.7rem; border-radius: 8px; }
   .fav { color: #f5b301; }
+  .photo { width: 100%; max-height: 320px; object-fit: cover; border-radius: 12px; margin: 0.75rem 0; display: block; }
+  .thumb { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; flex: none; }
+  .card.has-thumb { display: flex; gap: 0.8rem; align-items: center; }
+  .card.has-thumb > div { min-width: 0; }
+  .photo-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
   @media print { header button, .actions, .scaler button, #search, .chips { display: none; } }
 </style>
 </head>
@@ -129,10 +134,12 @@ function listView() {
       ${tags.map((t) => `<button class="chip ${filter.tag === t ? "active" : ""}" onclick="setTag('${esc(t).replace(/'/g, "\\'")}')">${esc(t)}</button>`).join("")}
     </div>
     ${shown.length ? shown.map((r) => `
-      <button class="card" onclick="openRecipe('${r.id}')">
+      <button class="card ${r.photo ? "has-thumb" : ""}" onclick="openRecipe('${r.id}')">
+        ${r.photo ? `<img class="thumb" src="${esc(r.photo)}" alt="">` : ""}<div>
         <h3>${r.fav ? '<span class="fav">★</span> ' : ""}${esc(r.title)}</h3>
         <div class="meta">${[r.time && "⏱ " + esc(r.time), r.servings && "🍽 " + r.servings + " servings", r.ingredients.length + " ingredients"].filter(Boolean).join(" · ")}</div>
         ${r.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join("")}
+        </div>
       </button>`).join("")
       : `<div class="empty">${recipes.length ? "No recipes match." : "No recipes yet. Tap “+ New” to add your first."}</div>`}
     <input type="file" id="importInput" accept="application/json" class="hidden">
@@ -159,6 +166,7 @@ function detailView() {
     <header><button onclick="goList()">← Back</button>
       <button class="link fav" style="font-size:1.6rem" onclick="toggleFav('${r.id}')">${r.fav ? "★" : "☆"}</button></header>
     <h1>${esc(r.title)}</h1>
+    ${r.photo ? `<img class="photo" src="${esc(r.photo)}" alt="Photo of ${esc(r.title)}">` : ""}
     <div class="meta">${[r.time && "⏱ " + esc(r.time), r.source && esc(r.source)].filter(Boolean).join(" · ")}</div>
     ${r.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join("")}
     ${base ? `<p class="scaler">Servings:
@@ -182,6 +190,15 @@ function editView() {
   return `
     <header><button onclick="cancelEdit()">Cancel</button><h1>${view.isNew ? "New recipe" : "Edit recipe"}</h1>
       <button class="primary" onclick="saveEdit()">Save</button></header>
+    <label>Photo</label>
+    <div id="f-photo-preview">${r.photo ? `<img class="photo" src="${esc(r.photo)}" alt="">` : ""}</div>
+    <div class="photo-actions">
+      <button type="button" onclick="document.getElementById('f-cam').click()">📷 Take photo</button>
+      <button type="button" onclick="document.getElementById('f-pick').click()">🖼 Choose photo</button>
+      <button type="button" id="f-photo-remove" class="danger ${r.photo ? "" : "hidden"}" onclick="setPhoto('')">Remove</button>
+    </div>
+    <input type="file" id="f-cam" accept="image/*" capture="environment" class="hidden" onchange="photoChosen(this)">
+    <input type="file" id="f-pick" accept="image/*" class="hidden" onchange="photoChosen(this)">
     <label>Title</label><input id="f-title" value="${esc(r.title)}" placeholder="e.g. Lemon pasta">
     <div class="row">
       <div><label>Servings</label><input id="f-servings" type="number" min="1" value="${r.servings || ""}"></div>
@@ -252,8 +269,31 @@ function calcFrom(field, raw) {
 function calcRefresh() { if (calc[calc.last] !== "") calcFrom(calc.last, calc[calc.last]); }
 function setCalc(f, val) { calc[f] = val; const el = document.getElementById("c-" + f); if (el) el.value = val; }
 
+// ---- photos: downscaled to JPEG so they fit in localStorage ----
+function photoChosen(input) {
+  const file = input.files[0]; input.value = "";
+  if (!file) return;
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    const max = 1024, k = Math.min(1, max / Math.max(img.width, img.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(url);
+    setPhoto(c.toDataURL("image/jpeg", 0.8));
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); alert("Couldn't read that image."); };
+  img.src = url;
+}
+function setPhoto(dataUrl) {
+  view.draft.photo = dataUrl;   // updated in place so typed text in the form isn't lost
+  document.getElementById("f-photo-preview").innerHTML = dataUrl ? `<img class="photo" src="${esc(dataUrl)}" alt="">` : "";
+  document.getElementById("f-photo-remove").classList.toggle("hidden", !dataUrl);
+}
+
 // ---- actions ----
-const blank = () => ({ id: uid(), title: "", servings: 4, time: "", tags: [], source: "", ingredients: [], steps: [], notes: "", fav: false });
+const blank = () => ({ id: uid(), title: "", servings: 4, time: "", tags: [], source: "", ingredients: [], steps: [], notes: "", fav: false, photo: "" });
 function newRecipe() { view = { name: "edit", isNew: true, draft: blank() }; render(); }
 function editRecipe(id) { view = { name: "edit", isNew: false, draft: structuredClone(recipes.find((r) => r.id === id)) }; render(); }
 function cancelEdit() { view = view.isNew ? { name: "list" } : { name: "detail", id: view.draft.id }; render(); }
@@ -322,6 +362,7 @@ function doImport(e) {
       r.tags = [].concat(r.tags || []).map(String);
       r.ingredients = [].concat(r.ingredients || []).map(String);
       r.steps = [].concat(r.steps || []).map(String);
+      r.photo = typeof r.photo === "string" && r.photo.startsWith("data:image/") ? r.photo : "";
       recipes.push(r); added++;
     }
     save(); render(); alert(`Imported ${added} recipe${added === 1 ? "" : "s"}.`);

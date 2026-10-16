@@ -1,4 +1,4 @@
-const CACHE_NAME = "recipes-v4";
+const CACHE_NAME = "recipes-v5";
 const ASSETS = ["./privacy.html", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (event) => {
